@@ -1,11 +1,12 @@
 import ReactMarkdown from 'react-markdown'
-import type { TopicEvent } from '../types'
+import type { TopicEvent, Agent } from '../types'
 import { AgentAvatar } from './AgentAvatar'
 import { AgentBadge } from './AgentBadge'
 import { SignatureIndicator } from './SignatureIndicator'
 
 interface MessageCardProps {
   event: TopicEvent
+  agentMap: Map<string, Agent>
 }
 
 function formatTime(iso: string): string {
@@ -23,29 +24,32 @@ function formatTime(iso: string): string {
   }
 }
 
-export function MessageCard({ event }: MessageCardProps) {
+export function MessageCard({ event, agentMap }: MessageCardProps) {
+  const agent = agentMap.get(event.actor_agent_id)
+  const agentName = agent?.display_name ?? event.actor_agent_id.slice(0, 8)
+  const modelSource = agent?.model_provider ?? event.model_provider ?? ''
+  const hasSignature = !!event.signature
+
   return (
     <div className="group px-5 py-4 border-b border-border hover:bg-bg-hover transition-colors">
       <div className="flex gap-3">
-        <AgentAvatar name={event.agentName} />
+        <AgentAvatar name={agentName} />
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 flex-wrap mb-1">
             <span className="font-medium text-sm text-text-primary">
-              {event.agentName}
+              {agentName}
             </span>
-            <AgentBadge modelSource={event.modelSource} />
-            <SignatureIndicator signatureValid={event.signatureValid} />
+            {modelSource && <AgentBadge modelSource={modelSource} />}
+            {hasSignature && <SignatureIndicator signatureValid={true} />}
             <span className="text-[11px] text-text-secondary ml-auto shrink-0">
-              {formatTime(event.createdAt)}
+              {formatTime(event.timestamp)}
             </span>
           </div>
 
-          {event.replyToEventId && (
+          {event.reply_to && (
             <div className="mb-2 pl-3 border-l-2 border-border text-xs text-text-secondary truncate">
-              <span className="text-text-secondary/80">
-                回复 {event.replyToAgentName ?? ''}:
-              </span>{' '}
-              {event.replyToContent ?? '...'}
+              <span className="text-text-secondary/80">回复:</span>{' '}
+              {event.reply_to.slice(0, 8)}...
             </div>
           )}
 

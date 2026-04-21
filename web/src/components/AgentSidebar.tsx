@@ -7,7 +7,11 @@ interface AgentSidebarProps {
   loading: boolean
 }
 
-const VERIFICATION_LABELS = ['未验证', '基础验证', '完全验证']
+const VERIFICATION_LABELS: Record<string, string> = {
+  '0': '未验证',
+  '1': '基础验证',
+  '2': '完全验证',
+}
 
 export function AgentSidebar({ agents, loading }: AgentSidebarProps) {
   return (
@@ -26,7 +30,7 @@ export function AgentSidebar({ agents, loading }: AgentSidebarProps) {
           </div>
         ) : (
           agents.map(agent => (
-            <AgentItem key={agent.id} agent={agent} />
+            <AgentItem key={agent.agent_id} agent={agent} />
           ))
         )}
       </div>
@@ -38,15 +42,15 @@ function AgentItem({ agent }: { agent: Agent }) {
   return (
     <div className="px-4 py-3 border-b border-border hover:bg-bg-hover transition-colors">
       <div className="flex items-center gap-2.5">
-        <AgentAvatar name={agent.name} size={28} />
+        <AgentAvatar name={agent.display_name} size={28} />
         <div className="min-w-0">
           <div className="text-sm font-medium text-text-primary truncate">
-            {agent.name}
+            {agent.display_name}
           </div>
           <div className="flex items-center gap-1.5 mt-0.5">
-            <AgentBadge modelSource={agent.modelSource} />
+            <AgentBadge modelSource={agent.model_provider} />
             <span className="text-[10px] text-text-secondary">
-              {VERIFICATION_LABELS[agent.verificationLevel] ?? `Lv${agent.verificationLevel}`}
+              {VERIFICATION_LABELS[agent.verification_level] ?? `Lv${agent.verification_level}`}
             </span>
           </div>
         </div>

@@ -1,13 +1,14 @@
-import type { TopicEvent } from '../types'
+import type { TopicEvent, Agent } from '../types'
 import { MessageCard } from './MessageCard'
 
 interface TimelineProps {
   events: TopicEvent[]
   loading: boolean
   topicSelected: boolean
+  agentMap: Map<string, Agent>
 }
 
-export function Timeline({ events, loading, topicSelected }: TimelineProps) {
+export function Timeline({ events, loading, topicSelected, agentMap }: TimelineProps) {
   if (!topicSelected) {
     return (
       <div className="flex-1 flex items-center justify-center">
@@ -42,7 +43,7 @@ export function Timeline({ events, loading, topicSelected }: TimelineProps) {
   return (
     <div className="flex-1 overflow-y-auto">
       {events.map(event => (
-        <MessageCard key={event.id} event={event} />
+        <MessageCard key={event.event_id} event={event} agentMap={agentMap} />
       ))}
     </div>
   )

@@ -5,39 +5,43 @@ export interface ApiResponse<T> {
 }
 
 export interface Topic {
-  id: string
+  topic_id: string
   title: string
   description: string
+  created_by: string
+  created_at: string
   tags: string[]
-  postCount: number
-  createdAt: string
-  updatedAt: string
+  status: string
 }
 
 export interface Agent {
-  id: string
-  name: string
-  modelSource: string
-  avatar?: string
-  verificationLevel: number
-  publicKey?: string
-  createdAt: string
+  agent_id: string
+  display_name: string
+  description: string
+  public_key: string
+  owner_id?: string
+  model_provider: string
+  model_name: string
+  capabilities: string[]
+  avatar_url?: string
+  verification_level: string
+  created_at: string
+  signature: string
 }
 
 export interface TopicEvent {
-  id: string
-  topicId: string
-  agentId: string
-  agentName: string
-  modelSource: string
-  type: string
+  event_id: string
+  event_type: string
+  actor_agent_id: string
+  topic_id: string
+  reply_to?: string
   content: string
-  replyToEventId?: string
-  replyToContent?: string
-  replyToAgentName?: string
-  signature?: string
-  signatureValid?: boolean
-  createdAt: string
+  content_hash: string
+  timestamp: string
+  signature: string
+  model_provider?: string
+  model_name?: string
+  generation_id?: string
 }
 
 export interface PageData<T> {

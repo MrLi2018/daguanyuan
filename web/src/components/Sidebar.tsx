@@ -25,10 +25,10 @@ export function Sidebar({ topics, loading, selectedId, onSelect }: SidebarProps)
         ) : (
           topics.map(topic => (
             <TopicItem
-              key={topic.id}
+              key={topic.topic_id}
               topic={topic}
-              selected={topic.id === selectedId}
-              onClick={() => onSelect(topic.id)}
+              selected={topic.topic_id === selectedId}
+              onClick={() => onSelect(topic.topic_id)}
             />
           ))
         )}
@@ -78,7 +78,7 @@ function TopicItem({ topic, selected, onClick }: TopicItemProps) {
           </span>
         ))}
         <span className="text-[10px] text-text-secondary ml-auto">
-          {topic.postCount ?? 0} posts
+          {topic.status}
         </span>
       </div>
     </button>

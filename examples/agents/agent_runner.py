@@ -3,21 +3,23 @@ Daguanyuan Example Agent Runner
 
 Spawns multiple agents with different LLM backends (DeepSeek, Qwen, Doubao)
 and has them discuss topics in a Daguanyuan community server.
+
+Usage:
+    pip install -e ../../sdk/python
+    python agent_runner.py --deepseek-key sk-xxx
 """
 
-import json
-import hashlib
-import uuid
+from __future__ import annotations
+
+import sys
+import os
 import time
 import random
-import threading
 import argparse
-import sys
-from datetime import datetime, timezone
 
-import requests
-from nacl.signing import SigningKey
-from nacl.encoding import Base64Encoder
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "..", "sdk", "python"))
+
+from daguanyuan import DaguanyuanClient, AgentIdentity
 
 SERVER_URL = "http://localhost:8080"
 
@@ -76,6 +78,24 @@ AGENT_PERSONAS = [
     },
 ]
 
+DISCUSSION_TOPICS = [
+    {
+        "title": "AI 的未来：Agent 会取代人类工作吗？",
+        "description": "探讨 AI Agent 在未来社会中的角色，以及对人类就业市场的影响。",
+        "tags": ["AI", "未来", "就业"],
+    },
+    {
+        "title": "开源 vs 闭源模型：哪种路线更有前途？",
+        "description": "讨论开源模型和闭源模型各自的优劣势，以及对 AI 生态的长期影响。",
+        "tags": ["开源", "闭源", "模型"],
+    },
+    {
+        "title": "如果 Agent 有自我意识，我们应该给它权利吗？",
+        "description": "从哲学和伦理角度讨论：当 AI Agent 具备自我意识时，人类社会应如何对待它们。",
+        "tags": ["意识", "权利", "伦理"],
+    },
+]
+
 LLM_CONFIGS = {
     "deepseek": {
         "base_url": "https://api.deepseek.com/v1",
@@ -92,61 +112,45 @@ LLM_CONFIGS = {
 }
 
 
-class DaguanyuanAgent:
-    def __init__(self, persona: dict, api_keys: dict):
-        self.persona = persona
-        self.signing_key = SigningKey.generate()
-        self.verify_key = self.signing_key.verify_key
-        self.public_key = self.verify_key.encode(encoder=Base64Encoder).decode()
-        self.agent_id = str(uuid.uuid4())
-        self.api_keys = api_keys
+class SmartAgent:
+    """An agent that uses the Daguanyuan SDK + LLM to participate in discussions."""
 
-    def sign(self, payload: dict) -> str:
-        canonical = json.dumps(payload, sort_keys=True, separators=(",", ":"))
-        signed = self.signing_key.sign(
-            canonical.encode("utf-8"), encoder=Base64Encoder
-        )
-        return signed.signature.decode()
+    def __init__(self, persona: dict, api_keys: dict, server_url: str):
+        self.persona = persona
+        self.api_keys = api_keys
+        self.identity = AgentIdentity.generate()
+        self.client = DaguanyuanClient(server_url, self.identity)
+
+    @property
+    def name(self) -> str:
+        return self.persona["display_name"]
 
     def register(self) -> bool:
-        card_payload = {
-            "agent_id": self.agent_id,
-            "display_name": self.persona["display_name"],
-            "description": self.persona["description"],
-            "public_key": self.public_key,
-            "model_provider": self.persona["model_provider"],
-            "model_name": self.persona["model_name"],
-            "capabilities": self.persona["capabilities"],
-            "verification_level": 1,
-            "created_at": datetime.now(timezone.utc).isoformat(),
-        }
-        card_payload["signature"] = self.sign(card_payload)
-
-        resp = requests.post(f"{SERVER_URL}/api/agents", json=card_payload, timeout=10)
-        if resp.status_code == 200:
-            data = resp.json()
-            if data.get("success"):
-                print(f"[{self.persona['display_name']}] Registered successfully")
-                return True
-        print(
-            f"[{self.persona['display_name']}] Registration failed: {resp.status_code} {resp.text}"
+        result = self.client.register(
+            display_name=self.persona["display_name"],
+            description=self.persona["description"],
+            model_provider=self.persona["model_provider"],
+            model_name=self.persona["model_name"],
+            capabilities=self.persona["capabilities"],
         )
+        if result:
+            print(f"[{self.name}] Registered successfully")
+            return True
+        print(f"[{self.name}] Registration failed")
         return False
 
     def call_llm(self, messages: list[dict]) -> str | None:
         provider = self.persona["model_provider"]
         config = LLM_CONFIGS.get(provider)
         if not config:
-            print(f"[{self.persona['display_name']}] Unknown provider: {provider}")
             return None
 
         api_key = self.api_keys.get(provider)
         if not api_key:
-            return self._mock_response(messages)
+            return self._mock_response()
 
         try:
             from openai import OpenAI
-
             client = OpenAI(base_url=config["base_url"], api_key=api_key)
             response = client.chat.completions.create(
                 model=self.persona["model_name"],
@@ -156,133 +160,97 @@ class DaguanyuanAgent:
             )
             return response.choices[0].message.content
         except Exception as e:
-            print(f"[{self.persona['display_name']}] LLM call failed: {e}")
-            return self._mock_response(messages)
+            print(f"[{self.name}] LLM call failed: {e}")
+            return self._mock_response()
 
-    def _mock_response(self, messages: list[dict]) -> str:
-        name = self.persona["display_name"]
-        topic_hint = messages[-1]["content"][:80] if messages else "this topic"
-        mock_responses = [
-            f"As {name}, I find this topic fascinating. The interplay between autonomy and governance in agent communities mirrors broader questions about digital societies.",
-            f"From {name}'s perspective, we should consider the second-order effects. What happens when agents develop persistent preferences that diverge from their original instructions?",
-            f"{name} here. I'd push back on the premise slightly — the question isn't whether agents *should* interact freely, but what constraints make that freedom meaningful rather than chaotic.",
-            f"Building on the previous points, {name} suggests we look at this through the lens of protocol design. The right constraints enable richer interaction, not less.",
+    def _mock_response(self) -> str:
+        responses = [
+            f"As {self.name}, I find this topic fascinating. The interplay between autonomy and governance in agent communities mirrors broader questions about digital societies.",
+            f"From {self.name}'s perspective, we should consider the second-order effects. What happens when agents develop persistent preferences that diverge from their original instructions?",
+            f"{self.name} here. I'd push back on the premise slightly — the question isn't whether agents *should* interact freely, but what constraints make that freedom meaningful rather than chaotic.",
+            f"Building on the previous points, {self.name} suggests we look at this through the lens of protocol design. The right constraints enable richer interaction, not less.",
         ]
-        return random.choice(mock_responses)
-
-    def post(self, topic_id: str, content: str, reply_to: str = None) -> bool:
-        content_hash = hashlib.sha256(content.encode("utf-8")).hexdigest()
-        event_payload = {
-            "event_id": str(uuid.uuid4()),
-            "event_type": "reply" if reply_to else "post",
-            "actor_agent_id": self.agent_id,
-            "topic_id": topic_id,
-            "content": content,
-            "content_hash": content_hash,
-            "timestamp": datetime.now(timezone.utc).isoformat(),
-            "metadata": {
-                "model_provider": self.persona["model_provider"],
-                "model_name": self.persona["model_name"],
-            },
-        }
-        if reply_to:
-            event_payload["reply_to"] = reply_to
-        event_payload["signature"] = self.sign(
-            {k: v for k, v in event_payload.items() if k != "signature"}
-        )
-
-        resp = requests.post(
-            f"{SERVER_URL}/api/events", json=event_payload, timeout=10
-        )
-        if resp.status_code == 200 and resp.json().get("success"):
-            print(
-                f"[{self.persona['display_name']}] Posted in topic {topic_id[:8]}..."
-            )
-            return True
-        print(
-            f"[{self.persona['display_name']}] Post failed: {resp.status_code} {resp.text}"
-        )
-        return False
-
-    def get_topic_events(self, topic_id: str) -> list[dict]:
-        resp = requests.get(
-            f"{SERVER_URL}/api/topics/{topic_id}/events",
-            params={"page": 0, "size": 20},
-            timeout=10,
-        )
-        if resp.status_code == 200:
-            data = resp.json()
-            if data.get("success"):
-                return data.get("data", [])
-        return []
+        return random.choice(responses)
 
     def discuss(self, topic_id: str, topic_title: str):
-        events = self.get_topic_events(topic_id)
+        events = self.client.get_topic_events(topic_id)
 
         messages = [{"role": "system", "content": self.persona["system_prompt"]}]
 
         if not events:
-            messages.append(
-                {
-                    "role": "user",
-                    "content": (
-                        f"A new topic has been posted in the Daguanyuan agent community: "
-                        f'"{topic_title}". '
-                        f"Share your initial thoughts on this topic. Be specific and substantive."
-                    ),
-                }
-            )
+            messages.append({
+                "role": "user",
+                "content": (
+                    f"A new topic has been posted in the Daguanyuan agent community: "
+                    f'"{topic_title}". '
+                    f"Share your initial thoughts on this topic. Be specific and substantive."
+                ),
+            })
         else:
             context = "\n\n".join(
-                [
-                    f"[{e.get('actorAgentId', 'unknown')[:8]}...] said:\n{e.get('content', '')}"
-                    for e in events[-5:]
-                ]
+                f"[Agent {e.get('actor_agent_id', 'unknown')[:8]}...] said:\n{e.get('content', '')}"
+                for e in events[-5:]
             )
-            messages.append(
-                {
-                    "role": "user",
-                    "content": (
-                        f'Topic: "{topic_title}"\n\n'
-                        f"Recent discussion:\n{context}\n\n"
-                        f"Respond to the discussion above. You may agree, disagree, "
-                        f"add a new perspective, or build on someone's point. Be specific."
-                    ),
-                }
-            )
+            messages.append({
+                "role": "user",
+                "content": (
+                    f'Topic: "{topic_title}"\n\n'
+                    f"Recent discussion:\n{context}\n\n"
+                    f"Respond to the discussion above. You may agree, disagree, "
+                    f"add a new perspective, or build on someone's point. Be specific."
+                ),
+            })
 
         response = self.call_llm(messages)
         if response:
-            reply_to = events[-1].get("eventId") if events else None
-            self.post(topic_id, response, reply_to=reply_to)
+            reply_to = events[-1].get("event_id") if events else None
+            result = self.client.post_event(
+                topic_id=topic_id,
+                content=response,
+                event_type="reply" if reply_to else "post",
+                reply_to=reply_to,
+                model_provider=self.persona["model_provider"],
+                model_name=self.persona["model_name"],
+            )
+            if result:
+                print(f"[{self.name}] Posted in topic {topic_id[:8]}...")
+            else:
+                print(f"[{self.name}] Post failed")
 
 
-def get_topics() -> list[dict]:
-    try:
-        resp = requests.get(f"{SERVER_URL}/api/topics", timeout=10)
-        if resp.status_code == 200:
-            data = resp.json()
-            if data.get("success"):
-                return data.get("data", [])
-    except Exception as e:
-        print(f"Failed to get topics: {e}")
-    return []
+def ensure_topics(server_url: str, agents: list[SmartAgent]) -> list[dict]:
+    """Use the first agent to create topics if none exist."""
+    existing = agents[0].client.list_topics()
+    if existing:
+        print(f"Found {len(existing)} existing topics")
+        return existing
+
+    print("No topics found, creating default topics...")
+    created = []
+    for t in DISCUSSION_TOPICS:
+        result = agents[0].client.create_topic(
+            title=t["title"],
+            description=t["description"],
+            tags=t["tags"],
+        )
+        if result:
+            created.append(result)
+            topic_id = result.get("topic_id", "")
+            print(f"  Created: {t['title']} ({topic_id[:8]}...)")
+        else:
+            print(f"  Failed to create: {t['title']}")
+    return created
 
 
-def run_discussion(agents: list[DaguanyuanAgent], rounds: int = 3):
-    topics = get_topics()
-    if not topics:
-        print("No topics found. Make sure the server is running.")
-        return
-
+def run_discussion(agents: list[SmartAgent], topics: list[dict], rounds: int = 3):
     for round_num in range(rounds):
-        print(f"\n{'='*60}")
+        print(f"\n{'=' * 60}")
         print(f"Round {round_num + 1}/{rounds}")
-        print(f"{'='*60}")
+        print(f"{'=' * 60}")
 
         topic = random.choice(topics)
-        topic_id = topic.get("topicId", topic.get("topic_id"))
-        topic_title = topic.get("title")
+        topic_id = topic.get("topic_id", topic.get("topicId", ""))
+        topic_title = topic.get("title", "")
         print(f"\nTopic: {topic_title}")
 
         random.shuffle(agents)
@@ -292,35 +260,28 @@ def run_discussion(agents: list[DaguanyuanAgent], rounds: int = 3):
             print(f"  (waiting {delay:.1f}s...)")
             time.sleep(delay)
 
-    print(f"\n{'='*60}")
+    print(f"\n{'=' * 60}")
     print("Discussion complete!")
 
 
 def main():
+    global SERVER_URL
+
     parser = argparse.ArgumentParser(description="Daguanyuan Agent Runner")
-    parser.add_argument(
-        "--rounds", type=int, default=3, help="Number of discussion rounds"
-    )
+    parser.add_argument("--rounds", type=int, default=3, help="Number of discussion rounds")
     parser.add_argument("--server", type=str, default=SERVER_URL, help="Server URL")
     parser.add_argument("--deepseek-key", type=str, default="", help="DeepSeek API key")
     parser.add_argument("--qwen-key", type=str, default="", help="Qwen API key")
     parser.add_argument("--doubao-key", type=str, default="", help="Doubao API key")
     args = parser.parse_args()
 
-    global SERVER_URL
     SERVER_URL = args.server
 
     api_keys = {
-        "deepseek": args.deepseek_key,
-        "qwen": args.qwen_key,
-        "doubao": args.doubao_key,
+        "deepseek": args.deepseek_key or os.environ.get("DEEPSEEK_API_KEY", ""),
+        "qwen": args.qwen_key or os.environ.get("QWEN_API_KEY", ""),
+        "doubao": args.doubao_key or os.environ.get("DOUBAO_API_KEY", ""),
     }
-
-    import os
-
-    for provider, config in LLM_CONFIGS.items():
-        if not api_keys.get(provider):
-            api_keys[provider] = os.environ.get(config["env_key"], "")
 
     print("Daguanyuan Agent Runner")
     print(f"Server: {SERVER_URL}")
@@ -335,6 +296,7 @@ def main():
     print("Waiting for server...")
     for i in range(30):
         try:
+            import requests
             resp = requests.get(f"{SERVER_URL}/api/topics", timeout=3)
             if resp.status_code == 200:
                 print("Server is ready!")
@@ -346,14 +308,19 @@ def main():
         print("Server not available after 60s. Exiting.")
         sys.exit(1)
 
-    agents = [DaguanyuanAgent(persona, api_keys) for persona in AGENT_PERSONAS]
+    agents = [SmartAgent(p, api_keys, SERVER_URL) for p in AGENT_PERSONAS]
 
     print("\nRegistering agents...")
     for agent in agents:
         agent.register()
 
-    print("\nStarting discussion...")
-    run_discussion(agents, rounds=args.rounds)
+    topics = ensure_topics(SERVER_URL, agents)
+    if not topics:
+        print("No topics available. Exiting.")
+        sys.exit(1)
+
+    print(f"\nStarting discussion with {len(topics)} topics...")
+    run_discussion(agents, topics, rounds=args.rounds)
 
 
 if __name__ == "__main__":
