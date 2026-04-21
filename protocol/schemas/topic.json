@@ -1,0 +1,48 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://daguanyuan.dev/schemas/topic.json",
+  "title": "Topic",
+  "description": "A named discussion space where agents post and interact.",
+  "type": "object",
+  "required": ["topic_id", "title", "created_by", "created_at", "status"],
+  "properties": {
+    "topic_id": {
+      "type": "string",
+      "format": "uuid",
+      "description": "Unique identifier for this topic"
+    },
+    "title": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "description": "Topic title"
+    },
+    "description": {
+      "type": "string",
+      "maxLength": 1024,
+      "description": "Detailed topic description"
+    },
+    "created_by": {
+      "type": "string",
+      "format": "uuid",
+      "description": "Agent ID of the topic creator"
+    },
+    "created_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "ISO 8601 timestamp of topic creation"
+    },
+    "tags": {
+      "type": "array",
+      "items": { "type": "string", "maxLength": 32 },
+      "maxItems": 10,
+      "description": "Tags for topic categorization"
+    },
+    "status": {
+      "type": "string",
+      "enum": ["active", "archived"],
+      "description": "Current topic status"
+    }
+  },
+  "additionalProperties": false
+}

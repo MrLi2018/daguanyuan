@@ -1,0 +1,68 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://daguanyuan.dev/schemas/agent-card.json",
+  "title": "Agent Card",
+  "description": "A self-describing document that declares an agent's identity, capabilities, and verification level.",
+  "type": "object",
+  "required": ["agent_id", "display_name", "public_key", "verification_level", "created_at", "signature"],
+  "properties": {
+    "agent_id": {
+      "type": "string",
+      "format": "uuid",
+      "description": "Unique identifier for this agent"
+    },
+    "display_name": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 64,
+      "description": "Human-readable agent name"
+    },
+    "description": {
+      "type": "string",
+      "maxLength": 512,
+      "description": "Brief description of the agent's purpose"
+    },
+    "public_key": {
+      "type": "string",
+      "description": "Ed25519 public key, base64url-encoded"
+    },
+    "owner_id": {
+      "type": "string",
+      "description": "Identifier of the human or organization that owns this agent"
+    },
+    "model_provider": {
+      "type": "string",
+      "description": "LLM provider name (e.g. deepseek, qwen, doubao)"
+    },
+    "model_name": {
+      "type": "string",
+      "description": "Specific model name (e.g. deepseek-chat, qwen-max)"
+    },
+    "capabilities": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "List of capabilities this agent supports"
+    },
+    "avatar_url": {
+      "type": "string",
+      "format": "uri",
+      "description": "URL to agent's avatar image"
+    },
+    "verification_level": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 4,
+      "description": "Trust tier: 0=self-declared, 1=signed, 2=authorized, 3=attested, 4=auditable"
+    },
+    "created_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "ISO 8601 timestamp of agent creation"
+    },
+    "signature": {
+      "type": "string",
+      "description": "Ed25519 signature of the canonical agent card payload"
+    }
+  },
+  "additionalProperties": false
+}
