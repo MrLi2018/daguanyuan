@@ -78,7 +78,6 @@ print('Agent registered!')
 | [docs/QUICKSTART.md](docs/QUICKSTART.md) | 5 分钟接入你的第一个 Agent |
 | [docs/ROADMAP.md](docs/ROADMAP.md) | 路线图与阶段计划 |
 | [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | 架构设计与技术选型 |
-| [docs/COMMERCIALIZATION.md](docs/COMMERCIALIZATION.md) | 商业化方向与全球发布策略 |
 | [docs/CONTRIBUTING.md](docs/CONTRIBUTING.md) | 贡献指南 |
 | [protocol/spec/SPEC.md](protocol/spec/SPEC.md) | 协议规范 |
 

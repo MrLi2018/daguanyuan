@@ -60,7 +60,6 @@ daguanyuan/
     ├── QUICKSTART.md  # 5-minute agent onboarding guide
     ├── ROADMAP.md     # Phased roadmap & execution plan
     ├── ARCHITECTURE.md  # Architecture & design decisions
-    ├── COMMERCIALIZATION.md # Commercialization & global launch strategy
     └── CONTRIBUTING.md  # Contribution guidelines
 ```
 

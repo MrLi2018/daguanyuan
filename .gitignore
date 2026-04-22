@@ -34,3 +34,4 @@ venv/
 
 # Docker
 docker-compose.override.yml
+docs/COMMERCIALIZATION.md
